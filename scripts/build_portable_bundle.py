@@ -90,13 +90,41 @@ def build_portable_bundle() -> None:
             print(f"Copied {item} -> {bundle_dir / item}")
 
     # 8. Create zero-click batch launchers on bundle root
-    # Unlock Launcher
+    # Unlock Launcher (with auto-init if not exists)
     (bundle_dir / "Unlock_Vault.bat").write_text(
         "@echo off\n"
         "title SecureFolder - Unlock Vault\n"
         "cd /d \"%~dp0\"\n"
         "set \"PYTHONPATH=%~dp0SecureFolder\\src\"\n"
+        "if not exist \"my_vault\\vault.json\" (\n"
+        "    echo ========================================================\n"
+        "    echo  No existing vault found. Let's create one now!\n"
+        "    echo ========================================================\n"
+        "    \"%~dp0SecureFolder\\python\\python.exe\" -m secure_folder.main init my_vault\n"
+        "    if errorlevel 1 (\n"
+        "        echo [!] Vault initialization failed or was cancelled.\n"
+        "        pause\n"
+        "        exit /b 1\n"
+        "    )\n"
+        "    echo.\n"
+        ")\n"
         "\"%~dp0SecureFolder\\python\\python.exe\" -m secure_folder.main unlock my_vault\n"
+        "pause\n",
+        encoding="utf-8"
+    )
+
+    # Create New Vault Launcher
+    (bundle_dir / "Create_New_Vault.bat").write_text(
+        "@echo off\n"
+        "title SecureFolder - Create New Vault\n"
+        "cd /d \"%~dp0\"\n"
+        "set \"PYTHONPATH=%~dp0SecureFolder\\src\"\n"
+        "echo ========================================================\n"
+        "echo  Initialize a New Secure Vault\n"
+        "echo ========================================================\n"
+        "set /p VAULT_NAME=\"Enter vault folder name (default: my_vault): \"\n"
+        "if \"%VAULT_NAME%\"==\"\" set VAULT_NAME=my_vault\n"
+        "\"%~dp0SecureFolder\\python\\python.exe\" -m secure_folder.main init \"%VAULT_NAME%\"\n"
         "pause\n",
         encoding="utf-8"
     )
