@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+DIR="$(cd "$(dirname "$0")/.." >/dev/null 2>&1 && pwd)"
+export PYTHONPATH="$DIR/src:$PYTHONPATH"
+python3 -m secure_folder.main "$@"
