@@ -1,6 +1,6 @@
 # SecureFolder User Manual
 
-**Version 2.0 (Portable Standalone Edition)**  
+**Version 2.0 (Zero-Block Portable Edition)**  
 *Cross-Platform Authenticated Password-Protected Vault*
 
 ---
@@ -12,10 +12,10 @@
 ### Key Concepts
 
 - **The Vault Directory (`my_vault/`)**:
-  This is the secured folder containing encrypted objects and metadata. You can safely store, move, or back up this folder. To anyone looking at it without the password:
+  The secured folder containing encrypted objects and metadata:
   - All file contents are encrypted with **AES-256-GCM**.
-  - All original file and folder names are hidden inside an encrypted manifest.
-  - Files are stored as opaque identifiers (e.g. `obj_a1b2c3d4...enc`).
+  - All original file and folder names are hidden inside an encrypted manifest (`manifest.enc`).
+  - Files are stored as opaque identifiers (`obj_a1b2c3d4...enc`).
 - **The Unlocked Workspace (`my_vault_unlocked/`)**:
   When you unlock your vault, SecureFolder decrypts your files into a temporary workspace folder. You can open, edit, create, or delete files just like in any normal folder.
 - **Locking**:
@@ -23,81 +23,85 @@
 
 ---
 
-## 2. Zero-Prerequisite Standalone Portability
+## 2. Zero-Block Portable Drive (Immune to Windows 11 Smart App Control)
 
-You do **not** need Python installed on foreign computers to unlock and manage your vault.
+Windows 11 features **Smart App Control (SAC)**, which blocks newly compiled or unsigned `.exe` files. 
 
-### Portable Executables for Each Platform
-- **Windows**: `secure-folder-windows.exe` (located in `dist/` or copied to drive root as `secure-folder.exe`).
-- **Linux**: `secure-folder-linux` (single-file ELF binary).
-- **macOS**: `secure-folder-macos` (single-file Mach-O binary).
+To ensure your external drive runs on **any Windows PC without ever being blocked**:
+The external drive carries **Microsoft's officially signed portable Python runtime** inside `SecureFolder/python/`. Because `python.exe` is digitally signed by Microsoft Corporation / Python Software Foundation, Smart App Control **never blocks it**.
 
-### Staging Your External Drive Automatically
-Run the drive staging utility to copy the executable, convenience double-click launchers, and user manual directly to your external drive (e.g., drive `E:`):
-```powershell
-python scripts/stage_drive.py E:\
-```
-
-This creates the ideal drive layout:
+### Drive Contents Layout:
 ```text
-External Drive (E:\)
-├── secure-folder.exe          <-- Standalone Windows binary (no Python needed)
-├── Unlock_Vault.bat           <-- Double-click to unlock
-├── Lock_Vault.bat             <-- Double-click to lock
+External Hard Drive Root (e.g., E:\)
+├── Unlock_Vault.bat           <-- Double-click to unlock your vault
+├── Lock_Vault.bat             <-- Double-click to lock your vault
+├── Status_Vault.bat           <-- Double-click to check status
+├── Verify_Vault.bat           <-- Double-click to verify file integrity
 ├── emergency_recover.py       <-- Standalone zero-dependency emergency decrypter
+├── SecureFolder/              <-- Self-contained signed runtime & engine
+│   ├── python/                <-- Official Microsoft-signed Python 3.11 runtime
+│   └── src/                   <-- SecureFolder source code
 ├── my_vault/                  <-- Encrypted vault
 └── USER_MANUAL.md             <-- Documentation
 ```
 
+### Staging to an External Hard Drive:
+To deploy the ready-to-run bundle directly onto a flash drive or external HDD (e.g. drive `E:`):
+```powershell
+python scripts/stage_drive.py E:\
+```
+*(Or simply drag and drop the files inside `dist/portable_bundle/` to your drive).*
+
 ---
 
-## 3. The "Anti-Lock-In" Guarantee & Emergency Recovery
+## 3. Daily Usage with 1-Click Launchers
 
-You are **never locked into this software**. Even if SecureFolder is not installed or the executable cannot be run, your drive carries `emergency_recover.py`:
+No terminal commands needed on the drive:
 
-- **Zero App Dependencies**: A single standalone Python script that directly reads `vault.json`, authenticates with your password, decrypts `manifest.enc`, and restores your files.
-- **Open Cryptographic Standards**: Uses standard Scrypt key derivation and AES-256-GCM authenticated encryption.
-- **To Recover**:
+1. **To Unlock**:
+   Double-click **`Unlock_Vault.bat`** on the drive. Enter your password. Your files appear in `my_vault_unlocked/`.
+2. **To Work**:
+   Open, edit, create, or delete files inside `my_vault_unlocked/` normally.
+3. **To Lock**:
+   Double-click **`Lock_Vault.bat`** on the drive. Enter your password. Changes are re-encrypted, integrity is verified, and the plaintext workspace is safely removed.
+
+---
+
+## 4. The "Anti-Lock-In" Guarantee & Emergency Recovery
+
+You are **never locked into this software**. Even if the SecureFolder launcher is deleted:
+- Your drive carries **`emergency_recover.py`**, a single standalone script with zero app dependencies that can decrypt any vault on any machine with Python:
   ```bash
   python emergency_recover.py my_vault
   ```
 
 ---
 
-## 4. Multi-Platform Build Automation (GitHub Actions)
+## 5. Command Reference (Terminal / Advanced)
 
-The repository includes a GitHub Actions CI workflow in `.github/workflows/build_binaries.yml` that automatically tests and compiles native standalone binaries for all three major operating systems:
-- Windows (`windows-latest`) $\rightarrow$ `secure-folder-windows.exe`
-- Linux (`ubuntu-22.04`) $\rightarrow$ `secure-folder-linux`
-- macOS (`macos-latest`) $\rightarrow$ `secure-folder-macos`
+If running directly from terminal:
+```bash
+# Using bundled signed python:
+.\SecureFolder\python\python.exe -m secure_folder.main <command> my_vault
 
-### Building Binaries Locally:
-- **Windows**: Run `scripts\build_windows.bat`
-- **Linux**: Run `bash scripts/build_linux.sh`
-- **macOS**: Run `bash scripts/build_macos.sh`
-
----
-
-## 5. Daily Command Reference
-
-You can run commands using `secure-folder.exe <command>` (or `python -m secure_folder.main <command>`):
+# Or using system python:
+python -m secure_folder.main <command> my_vault
+```
 
 | Command | Syntax | Description |
 | :--- | :--- | :--- |
-| `init` | `secure-folder.exe init <vault_dir>` | Initializes a new empty encrypted vault. |
-| `status` | `secure-folder.exe status <vault_dir>` | Shows if the vault is `LOCKED` or `UNLOCKED`. |
-| `unlock` | `secure-folder.exe unlock <vault_dir> [-w <ws>]` | Decrypts vault contents into an unlocked workspace. |
-| `lock` | `secure-folder.exe lock <vault_dir>` | Re-encrypts workspace changes and securely wipes the workspace. |
-| `verify` | `secure-folder.exe verify <vault_dir>` | Validates cryptographic authentication tags across all files. |
-| `change-password` | `secure-folder.exe change-password <vault_dir>` | Updates master password without re-encrypting data files. |
+| `init` | `... init <vault_dir>` | Initializes a new empty encrypted vault. |
+| `status` | `... status <vault_dir>` | Shows if the vault is `LOCKED` or `UNLOCKED`. |
+| `unlock` | `... unlock <vault_dir> [-w <ws>]` | Decrypts vault contents into an unlocked workspace. |
+| `lock` | `... lock <vault_dir>` | Re-encrypts workspace changes and securely wipes the workspace. |
+| `verify` | `... verify <vault_dir>` | Validates cryptographic authentication tags across all files. |
+| `change-password` | `... change-password <vault_dir>` | Updates master password without re-encrypting data files. |
 
 ---
 
 ## 6. Safety & Disconnect Protocol
 
-1. **Always Run `lock` Before Disconnecting**:
-   Before unplugging your external drive, always run `lock` (or double-click `Lock_Vault.bat`) to re-encrypt modified files, verify integrity, and erase the temporary unencrypted workspace.
-2. **Safe Ejection**:
-   Use Windows "Safely Remove Hardware and Eject Media" (or macOS/Linux eject) to ensure all disk write caches have flushed to the external hardware.
-3. **Emergency Backup**:
-   Periodically copy the `my_vault/` folder to a second physical location as an encrypted offline backup.
+1. **Always Run `Lock_Vault.bat` Before Disconnecting**:
+   Before unplugging your external drive, always lock the vault to ensure changes are encrypted and temporary files are cleared.
+2. **Safely Remove Hardware**:
+   Use Windows "Safely Remove Hardware" before unplugging to prevent physical file corruption.
