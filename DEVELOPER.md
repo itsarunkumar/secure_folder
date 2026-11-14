@@ -1,6 +1,6 @@
 # SecureFolder Developer Guide
 
-Comprehensive technical documentation for developers, contributors, and maintainers of the **SecureFolder** project.
+Technical documentation for developers, contributors, and maintainers of the **SecureFolder** project.
 
 ---
 
@@ -30,11 +30,11 @@ secure_folder/
 │   ├── utils/                    # Constants, exception classes, and safe logging
 │   └── main.py                   # CLI entry point and argument parsing
 ├── tests/                        # Automated pytest test suite
-├── scripts/                      # Platform launchers, build scripts, and drive staging
-├── dist/                         # Compiled standalone binaries
-├── .github/workflows/            # GitHub Actions CI/CD workflows
+├── scripts/                      # Launchers, bundle builder, and drive staging
+├── dist/portable_bundle/         # Zero-block signed portable distribution for external drives
+├── .github/workflows/ci.yml      # Multi-OS automated testing pipeline
 ├── pyproject.toml                # Build system & project metadata
-├── requirements.txt              # Production and test dependencies
+├── requirements.txt              # Dependencies (cryptography, pytest)
 ├── emergency_recover.py          # Standalone, zero-app-dependency recovery tool
 ├── USER_MANUAL.md                # End-user documentation
 └── DEVELOPER.md                  # Developer & maintainer guide (this file)
@@ -92,12 +92,12 @@ pip install -e . --no-build-isolation --no-deps
 ```
 
 ### 3.2 Running the Test Suite
-All tests must pass before opening PRs or tagging releases:
+All tests must pass before opening PRs:
 ```bash
 # Run all tests
 python -m pytest -v
 
-# Run a specific test module
+# Run specific modules
 python -m pytest tests/test_encryption.py -v
 python -m pytest tests/test_vault.py -v
 python -m pytest tests/test_emergency_recover.py -v
@@ -105,85 +105,33 @@ python -m pytest tests/test_emergency_recover.py -v
 
 ---
 
-## 4. Standalone Binaries & Compilation
+## 4. Zero-Cost Portability Architecture
 
-SecureFolder compiles into zero-prerequisite standalone executables using **PyInstaller**.
+### 4.1 Why We Avoid Unsigned Executable Binaries
+Modern operating systems (especially Windows 11 Smart App Control and macOS Gatekeeper) block custom compiled `.exe` / `.app` binaries unless they are signed with an expensive Authenticode / Apple Developer certificate.
 
-### 4.1 PyInstaller Specification (`secure_folder.spec`)
-- **Single-File Mode (`--onefile`)**: Bundles the Python runtime, dependencies, and code into a single binary.
-- **Dynamic C-Extension Bundling**: Explicitly collects the `cryptography` package binaries (OpenSSL DLLs/shared objects).
-- **Free-Threaded ABI Support (Python 3.15+)**: Automatically includes `abi3t-compat/python3t.dll` if building with Python 3.15 free-threaded builds.
+To ensure SecureFolder remains **100% free, open-source, and guaranteed to run on any computer**:
+- We use **Microsoft's officially signed portable Python runtime** inside `dist/portable_bundle/SecureFolder/python/`.
+- Because the binaries (`python.exe`, DLLs) are signed by Microsoft Corporation and the Python Software Foundation, Windows 11 Smart App Control allows them immediately without warnings.
 
-### 4.2 Local Compilation
-- **Windows**:
-  ```cmd
-  scripts\build_windows.bat
-  ```
-  Output: `dist\secure-folder-windows.exe`
-- **Linux**:
-  ```bash
-  bash scripts/build_linux.sh
-  ```
-  Output: `dist/secure-folder-linux`
-- **macOS**:
-  ```bash
-  bash scripts/build_macos.sh
-  ```
-  Output: `dist/secure-folder-macos`
-
----
-
-## 5. CI/CD & GitHub Releases Workflow
-
-Automated multi-platform builds and release creation are handled by `.github/workflows/build_binaries.yml`.
-
-### 5.1 Release Triggers & Workflow Logic
-The workflow compiles all 3 binaries on native GitHub runners:
-- `windows-latest` $\rightarrow$ `secure-folder-windows.exe`
-- `ubuntu-22.04` $\rightarrow$ `secure-folder-linux`
-- `macos-latest` $\rightarrow$ `secure-folder-macos`
-
-#### When Does It Create a GitHub Release?
-1. **Push to `main` branch**:
-   - Automatically builds all binaries and updates a rolling **`latest`** pre-release with attached binary assets.
-2. **Version Tag Push (e.g., `v1.0.0`)**:
-   - Creates a permanent tagged release (e.g. `SecureFolder v1.0.0`) with release notes and binary assets.
-3. **Manual Trigger (`workflow_dispatch`)**:
-   - Can be triggered manually anytime via the **Actions** tab in GitHub by clicking **"Run workflow"**.
-
-### 5.2 Creating a Tagged Version Release
-To release a new official version:
+### 4.2 Rebuilding the Portable Bundle
+To regenerate the portable bundle:
 ```bash
-# 1. Update version in src/secure_folder/__init__.py and pyproject.toml
-# 2. Commit changes
-git add .
-git commit -m "Release v1.1.0"
-
-# 3. Create and push Git tag
-git tag v1.1.0
-git push origin v1.1.0
+python scripts/build_portable_bundle.py
 ```
-
-### 5.3 Required GitHub Token Permissions
-The workflow requires write permissions to create releases. Ensure:
-- In `.github/workflows/build_binaries.yml`:
-  ```yaml
-  permissions:
-    contents: write
-  ```
-- In GitHub Repository Settings: **Settings $\rightarrow$ Actions $\rightarrow$ General $\rightarrow$ Workflow permissions $\rightarrow$ Read and write permissions**.
+This downloads the official signed Python embeddable runtime, installs `cryptography`, copies the source code, and creates 1-click batch launchers.
 
 ---
 
-## 6. Standalone Utilities
+## 5. Standalone Utilities
 
-### 6.1 `emergency_recover.py`
-A completely self-contained recovery script that has **no dependencies on the `secure_folder` package**. It exists to guarantee users are never trapped in a proprietary tool.
-- When modifying vault wire format or KDF parameters, **always** update and test `emergency_recover.py` via `tests/test_emergency_recover.py`.
+### 5.1 `emergency_recover.py`
+A completely self-contained recovery script with **zero dependencies on the `secure_folder` package**. It exists to guarantee users are never trapped in any proprietary tool.
+- When modifying vault wire format or KDF parameters, **always** verify `emergency_recover.py` via `tests/test_emergency_recover.py`.
 
-### 6.2 `scripts/stage_drive.py`
-Staging script to prepare an external USB or HDD:
+### 5.2 `scripts/stage_drive.py`
+Deploys the portable bundle directly onto an external USB or HDD:
 ```bash
 python scripts/stage_drive.py E:\
 ```
-Deploys `secure-folder.exe`, double-click launcher `.bat` scripts, `emergency_recover.py`, and user documentation to the external storage device.
+Copies the signed runtime, double-click batch launchers, `emergency_recover.py`, and documentation to the target drive.
