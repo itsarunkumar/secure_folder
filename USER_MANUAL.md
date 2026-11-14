@@ -1,6 +1,6 @@
 # SecureFolder User Manual
 
-**Version 1.0**  
+**Version 2.0 (Portable Standalone Edition)**  
 *Cross-Platform Authenticated Password-Protected Vault*
 
 ---
@@ -23,160 +23,81 @@
 
 ---
 
-## 2. Using on External Hard Drives & Moving Between Systems
+## 2. Zero-Prerequisite Standalone Portability
 
-One of the core design goals of SecureFolder is **100% portability** across different machines. You can keep your vault and the utility directly on an external hard drive and unlock it on any system.
+You do **not** need Python installed on foreign computers to unlock and manage your vault.
 
-### Why It Works Across Different Computers
+### Portable Executables for Each Platform
+- **Windows**: `secure-folder-windows.exe` (located in `dist/` or copied to drive root as `secure-folder.exe`).
+- **Linux**: `secure-folder-linux` (single-file ELF binary).
+- **macOS**: `secure-folder-macos` (single-file Mach-O binary).
 
-1. **Drive Letter Independence**:
-   SecureFolder uses relative POSIX paths internally. It does not hardcode drive letters (`C:`, `D:`, `E:`). If your drive mounts as `D:` on your desktop and `F:` on your laptop, the vault unlocks seamlessly.
-2. **Independent Storage**:
-   The vault is just one folder on your external drive. All other unencrypted files, movies, documents, or games on the drive remain untouched and completely independent.
-3. **Cross-Platform Cryptography**:
-   Scrypt and AES-256-GCM are standardized cryptographic algorithms that run identically on Windows, Linux, and macOS.
+### Staging Your External Drive Automatically
+Run the drive staging utility to copy the executable, convenience double-click launchers, and user manual directly to your external drive (e.g., drive `E:`):
+```powershell
+python scripts/stage_drive.py E:\
+```
 
-### Recommended Hard Drive Layout
-
+This creates the ideal drive layout:
 ```text
-External Hard Drive (e.g., E:\)
-├── SecureFolder/                 <-- Utility codebase or standalone executable
-│   ├── src/
-│   ├── scripts/
-│   └── ...
-├── my_vault/                     <-- Encrypted vault (leave here permanently)
-│   ├── vault.json
-│   ├── manifest.enc
-│   └── objects/
-└── Other Normal Files/           <-- Regular drive files remain untouched
+External Drive (E:\)
+├── secure-folder.exe          <-- Standalone Windows binary (no Python needed)
+├── Unlock_Vault.bat           <-- Double-click to unlock
+├── Lock_Vault.bat             <-- Double-click to lock
+├── emergency_recover.py       <-- Standalone zero-dependency emergency decrypter
+├── my_vault/                  <-- Encrypted vault
+└── USER_MANUAL.md             <-- Documentation
 ```
 
-### Unlocking on Another Computer
+---
 
-#### Option A: If the target computer has Python installed
-Open a terminal on the drive and run:
-```bash
-python -m secure_folder.main unlock my_vault
-```
-Or run the platform-specific launcher script from the `scripts/` folder:
-- **Windows**: Double-click or run `scripts\run_windows.bat unlock my_vault`
-- **Linux**: Run `./scripts/run_linux.sh unlock my_vault`
-- **macOS**: Run `./scripts/run_macos.command unlock my_vault`
+## 3. The "Anti-Lock-In" Guarantee & Emergency Recovery
 
-#### Option B: If the target computer does NOT have Python installed
-You can package SecureFolder into a standalone executable (e.g. `secure-folder.exe`) using PyInstaller:
-- Keep `secure-folder.exe` on the external drive.
-- Plug into any Windows computer and run:
-  ```cmd
-  secure-folder.exe unlock my_vault
+You are **never locked into this software**. Even if SecureFolder is not installed or the executable cannot be run, your drive carries `emergency_recover.py`:
+
+- **Zero App Dependencies**: A single standalone Python script that directly reads `vault.json`, authenticates with your password, decrypts `manifest.enc`, and restores your files.
+- **Open Cryptographic Standards**: Uses standard Scrypt key derivation and AES-256-GCM authenticated encryption.
+- **To Recover**:
+  ```bash
+  python emergency_recover.py my_vault
   ```
-  Zero installation or setup required.
 
 ---
 
-## 3. Step-by-Step Daily Workflow
+## 4. Multi-Platform Build Automation (GitHub Actions)
 
-### Step 1: Initialize a New Vault
-Create a vault named `personal_vault` on your drive:
-```powershell
-python -m secure_folder.main init personal_vault
-```
-You will be prompted to enter and confirm a master password.
+The repository includes a GitHub Actions CI workflow in `.github/workflows/build_binaries.yml` that automatically tests and compiles native standalone binaries for all three major operating systems:
+- Windows (`windows-latest`) $\rightarrow$ `secure-folder-windows.exe`
+- Linux (`ubuntu-22.04`) $\rightarrow$ `secure-folder-linux`
+- macOS (`macos-latest`) $\rightarrow$ `secure-folder-macos`
 
-### Step 2: Check Vault Status
-To inspect whether a vault is currently locked or unlocked:
-```powershell
-python -m secure_folder.main status personal_vault
-```
-
-### Step 3: Unlock Your Files
-When you need to work on your private documents:
-```powershell
-python -m secure_folder.main unlock personal_vault
-```
-- Enter your master password when prompted.
-- Your files will be decrypted into `personal_vault_unlocked/`.
-- Open `personal_vault_unlocked/` in File Explorer or your editor and work normally.
-
-### Step 4: Lock and Secure Your Files
-Once you finish editing or adding files:
-```powershell
-python -m secure_folder.main lock personal_vault
-```
-- Enter your password to authenticate.
-- SecureFolder detects added, modified, or deleted files, encrypts changes, updates the manifest, verifies integrity, and securely wipes the `personal_vault_unlocked` folder.
+### Building Binaries Locally:
+- **Windows**: Run `scripts\build_windows.bat`
+- **Linux**: Run `bash scripts/build_linux.sh`
+- **macOS**: Run `bash scripts/build_macos.sh`
 
 ---
 
-## 4. Command Reference
+## 5. Daily Command Reference
 
-All commands use the syntax: `python -m secure_folder.main <command> [options]` (or `secure-folder.exe <command>` if using the standalone binary).
+You can run commands using `secure-folder.exe <command>` (or `python -m secure_folder.main <command>`):
 
 | Command | Syntax | Description |
 | :--- | :--- | :--- |
-| `init` | `python -m secure_folder.main init <vault_dir>` | Initializes a new empty encrypted vault. |
-| `status` | `python -m secure_folder.main status <vault_dir>` | Shows if the vault is `LOCKED` or `UNLOCKED` without needing a password. |
-| `unlock` | `python -m secure_folder.main unlock <vault_dir> [-w <workspace>]` | Decrypts vault contents into an unlocked workspace folder. |
-| `lock` | `python -m secure_folder.main lock <vault_dir>` | Encrypts workspace changes back into the vault and deletes the workspace. |
-| `verify` | `python -m secure_folder.main verify <vault_dir>` | Validates cryptographic authentication tags across all objects to detect corruption. |
-| `change-password` | `python -m secure_folder.main change-password <vault_dir>` | Updates master password without needing to re-encrypt data files. |
+| `init` | `secure-folder.exe init <vault_dir>` | Initializes a new empty encrypted vault. |
+| `status` | `secure-folder.exe status <vault_dir>` | Shows if the vault is `LOCKED` or `UNLOCKED`. |
+| `unlock` | `secure-folder.exe unlock <vault_dir> [-w <ws>]` | Decrypts vault contents into an unlocked workspace. |
+| `lock` | `secure-folder.exe lock <vault_dir>` | Re-encrypts workspace changes and securely wipes the workspace. |
+| `verify` | `secure-folder.exe verify <vault_dir>` | Validates cryptographic authentication tags across all files. |
+| `change-password` | `secure-folder.exe change-password <vault_dir>` | Updates master password without re-encrypting data files. |
 
 ---
 
-## 5. Advanced Options & Workflows
+## 6. Safety & Disconnect Protocol
 
-### Custom Workspace Path
-By default, unlocking creates `<vault_dir>_unlocked`. You can specify a custom working folder using `-w` or `--workspace`:
-```powershell
-python -m secure_folder.main unlock personal_vault -w "D:\working_folder"
-```
-When locking, SecureFolder automatically remembers the active workspace from configuration.
-
-### Non-Interactive & Automated Scripting
-You can supply the password directly via CLI argument or environment variable:
-- **Command flag:**
-  ```powershell
-  python -m secure_folder.main unlock personal_vault --password "MySecretPass"
-  ```
-- **Environment variable (`SECURE_FOLDER_PASSWORD`):**
-  ```powershell
-  $env:SECURE_FOLDER_PASSWORD="MySecretPass"
-  python -m secure_folder.main unlock personal_vault
-  ```
-
-### Verifying Vault Health
-To verify that no files on your external drive have suffered silent bit rot, drive failure, or tampering:
-```powershell
-python -m secure_folder.main verify personal_vault
-```
-This inspects all authentication tags chunk-by-chunk without needing to extract files to disk.
-
-### Instant Password Change
-If you want to update your master password, SecureFolder uses key wrapping (Scrypt KEK wraps the random Vault Data Key). Changing the password takes only a second and never re-encrypts your actual data files:
-```powershell
-python -m secure_folder.main change-password personal_vault
-```
-
----
-
-## 6. Security & Safety Rules
-
-1. **Always Lock Before Unplugging**:
-   Before disconnecting an external hard drive, always run `lock` to ensure all changes are committed, authenticated, and that the unencrypted workspace is cleaned. Then use the OS "Safely Remove Hardware" option.
-2. **Keep Independent Backups**:
-   The vault protects your data from unauthorized access, but if your hard drive suffers physical hardware damage or you forget your master password, encrypted data cannot be recovered. Keep a backup copy of your vault folder in a secondary location.
-3. **Never Edit Files Inside `objects/` Directly**:
-   Do not rename or alter files inside `personal_vault/objects/` or modify `manifest.enc`. SecureFolder uses authenticated encryption; altering even a single bit will trigger tamper detection.
-
----
-
-## 7. Troubleshooting
-
-- **Error: `Invalid password or corrupted vault key`**:
-  Make sure you entered the correct password (passwords are case-sensitive).
-- **Error: `Corrupted chunk: authentication tag mismatch`**:
-  An encrypted file was tampered with, truncated, or suffered disk corruption. Run `verify` to identify which file is affected.
-- **Workspace not removed on lock**:
-  If re-encryption or integrity validation fails during `lock`, SecureFolder deliberately keeps your workspace untouched to prevent any loss of your modified work.
-- **Drive letter changed between computers**:
-  This is expected and fully supported. SecureFolder does not rely on drive letters—just pass the relative or absolute path on the current machine (e.g., `E:\personal_vault`).
+1. **Always Run `lock` Before Disconnecting**:
+   Before unplugging your external drive, always run `lock` (or double-click `Lock_Vault.bat`) to re-encrypt modified files, verify integrity, and erase the temporary unencrypted workspace.
+2. **Safe Ejection**:
+   Use Windows "Safely Remove Hardware and Eject Media" (or macOS/Linux eject) to ensure all disk write caches have flushed to the external hardware.
+3. **Emergency Backup**:
+   Periodically copy the `my_vault/` folder to a second physical location as an encrypted offline backup.
